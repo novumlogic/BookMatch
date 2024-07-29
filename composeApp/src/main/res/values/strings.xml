@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_book_match">Book Match</string>
+    <string name="label_login_screen">Login To\nGet Started</string>
+    <string name="label_login_with_google">Login with Google</string>
+    <string name="label_select_categories">Select Categories</string>
+    <string name="label_select_least_categories">Select at min 2 and max 5 categories</string>
+    <string name="label_edit_books_choice">Edit Choice</string>
+    <string name="label_home">Home</string>
+    <string name="label_match_book">Match Book</string>
+    <string name="label_your_rating">Your rating:</string>
+    <string name="label_recommendation_on_your_books">Recommendation based on your books</string>
+    <string name="label_log_out">Log out</string>
+    <string name="label_loading_books">Keep calm, loading your books</string>
+    <string name="label_loading_failed">Something went wrong while generating\nPlease retry</string>
+    <string name="label_choose_time">Choose time from below to load</string>
+    <string name="label_connect_internet">Please connect to Internet \n</string>
+    <string name="go_to_settings">Go to Settings</string>
+    <string name="label_then">Then\n</string>
+    <string name="label_retry">Retry</string>
+</resources>

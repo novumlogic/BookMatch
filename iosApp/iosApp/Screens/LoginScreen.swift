@@ -20,7 +20,7 @@ struct LoginScreen: View {
         VStack{
             Spacer()
             VStack {
-                Image(uiImage: UIImage(named: "AppIcon") ?? UIImage())
+                Image("AppLogo")
                     .resizable()
                     .frame(width: 250,height: 250)
                 

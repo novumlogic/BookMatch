@@ -1,5 +1,5 @@
 //
-//  HomeViewModel.swift
+//  SharedViewModel.swift
 //  iosApp
 //
 //  Created by NovumLogic-MacMiniM1 on 15/07/24.
@@ -71,17 +71,7 @@ final class SharedViewModel: ObservableObject{
         }
     }
     
-//    var lastRecommendationTime : Int64 {
-//        get{
-//            (UserDefaults.standard.object(forKey: "lastRecommendationTime") as? NSNumber)!.int64Value
-//        }
-//        
-//        set {
-//            UserDefaults.standard.set(NSNumber(value: Int64(newValue)), forKey: "lastRecommendationTime")
-//        }
-//        
-//    }
-    
+
     @AppStorage("categoryShown") private(set) var categoryShown = false
     @Published var selectedCategories = UserDefaults.standard.stringArray(forKey: "selectedCategories") ?? []
     
@@ -191,21 +181,13 @@ final class SharedViewModel: ObservableObject{
                 guard error == nil else { return }
                 guard let user else { return }
                 
-//                let accessToken = user.accessToken.tokenString
                 guard let idToken = user.idToken?.tokenString else {
                    print("No idToken found.")
                    return
                  }
                 Task{
                     do{
-//                        try await self.client.auth.signInWithIdToken(
-//                            credentials: OpenIDConnectCredentials(
-//                                provider: .google,
-//                                idToken: idToken,
-//                                accessToken: accessToken
-//                            )
-//                        )
-                        
+
                         try await SupabaseProvider.shared.signInWithToken(token: idToken)
                         DispatchQueue.main.async{
                             self.onLogin()
@@ -250,28 +232,6 @@ final class SharedViewModel: ObservableObject{
         }
 
         }
-        
-//        DispatchQueue.main.async{
-//            RemoteDataSource.shared.userExists(userId: user.id.uuidString) { result, error in
-//                print("The result was \(result) and error was \(error)")
-//                guard let result, error == nil else {
-//                    return
-//                }
-//                if result == true {
-//                    return
-//                } else{
-//                    let newUser = Users(userId: user.id.uuidString, email: user.email ?? "", displayName: user.userMetadata["name"] as? String ?? "" , avatarUrl: user.userMetadata["picture"] as? String ?? "", createdAt: "")
-//    
-//                    RemoteDataSource.shared.createUser(users: newUser) { result ,error  in
-//                        print("The result is \(result) and error = \(error)")
-//                        guard let result else{
-//                            return
-//                        }
-//    
-//                    }
-//                }
-//            }
-//        }
         
     }
     

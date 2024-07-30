@@ -46,6 +46,8 @@ The purpose of BookMatch is to offer users an intuitive and dynamic way to disco
  
 # Project Structure
 ### [Shared Module](../main/shared/src/commonMain/kotlin) 
+<img src="https://github.com/user-attachments/assets/ef4e9431-87de-4ed2-b4ce-16b96a02edaf" width=500/>
+
 - Contains business and shared logic for both apps i.e. composeApp and iosApp
 
 |Directory | Description | Important file
@@ -63,7 +65,18 @@ The purpose of BookMatch is to offer users an intuitive and dynamic way to disco
       - ```GEMINI_API_KEY```: Your Gemini api key (if you want to use gemini instead of OpenAi along with GeminiClient)
   - The [GeminiClient.kt](../main/shared/src/commonMain/kotlin/api/GeminiClient.kt) file is included for those who want to use Gemini for book recommendation generation. Replace ```GeminiClient```'s functions with ```OpenAiClient``` in ```MainViewModel.kt``` of composeApp and SharedViewModel.swift of iosApp
   - You can edit ```systemInstruction``` property inside [OpenAiClient](../main/shared/src/commonMain/kotlin/api/OpenAIClient.kt)/[GeminClient](../main/shared/src/commonMain/kotlin/api/GeminiClient.kt)  to customize the AI response according to your own needs.
- 
+
+ ### [Android UI](../main/composeApp/src/androidMain/kotlin/com/novumlogic/bookmatch)
+<img src="https://github.com/user-attachments/assets/33e282b3-4f06-4cf3-96f5-ecfebce61b2d"/>
+
+- The Android UI specific code is written under composeApp module's androidMain with jetpack compose. It contains code for all screens along with viewmodel which connect the data layer i.e. shared module to UI layer
+
+### [ios UI](../main/iosApp/iosApp)
+<img src="https://github.com/user-attachments/assets/950e3231-b41a-4c49-af58-ea99882dd8d0" /> 
+
+- The ios UI specific code is written under iosApp with swiftui along with viewmodel which connects data layer i.e. shared module to UI layer
+
+
 # Backend Structure
 ### Database tables 
 

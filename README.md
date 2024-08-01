@@ -384,7 +384,10 @@ cd BookMatch
 
 - For iOS: Run the project from Xcode on a simulator or device.
 
- 
+## Blog post
+
+For more information and insights like idea behind the app, challenge faced during the development, check out our Medium blog post:
+- [Building BookMatch: A Journey into AI-Powered Book Recommendations](https://medium.com/novumlogic/building-bookmatch-a-journey-into-ai-powered-book-recommendations-035c0594a2f6)
 
 ###  Contributing
 We welcome contributions from the community. Please fork the repository and create a pull request with your changes.

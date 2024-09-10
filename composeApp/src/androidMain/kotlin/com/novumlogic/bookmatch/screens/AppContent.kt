@@ -7,7 +7,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -22,6 +24,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.novumlogic.bookmatch.R
@@ -49,22 +53,29 @@ import model.BookDetails
 import model.Recommendations
 
 
+data class AppContentUiState(
+    val categoryList: List<Pair<String, String>>,
+    val selectedCategories: List<String>,
+    val bookMap: Map<String, List<BookDetails>>,
+    val currentRecommendationTimestamp: Long,
+    val recommendationStatus: RecommendationStatus
+)
+
+interface AppContentCallbacks{
+    suspend fun fetchRecommendationTimestamp(): List<Recommendations>?
+    fun fetchBooksFromRecommendationId(recommendationId: Int, recommendationTimestamp: Long)
+    fun filterEnabled() : Boolean
+    fun onCategoryChipChange(categoryName: String,selected: Boolean)
+    fun onCategoryScreenContinue() : Boolean
+    fun onRecommendMore(likedBookList: List<String>, dislikedBookList: List<String>, ratings: Map<String, Int>)
+    fun onLogout()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppContent(
-    categoryList: List<Pair<String, String>>,
-    selectedCategories: List<String>,
-    bookMap: Map<String, List<BookDetails>>,
-    fetchRecommendationTimestamp: suspend () -> List<Recommendations>?,
-    currentRecommendationTimestamp: Long,
-    fetchBooksFromId: (Int, Long) -> Unit,
-    filterEnabled: () -> Boolean,
-    onReloadCategoriesAndHistory: (Boolean) -> Unit,
-    recommendationStatus: RecommendationStatus,
-    onCategoryChipChange: (String, Boolean) -> Unit,
-    onCategoryScreenContinue: () -> Boolean,
-    onRecommendMore: (likedBookList: List<String>, dislikedBookList: List<String>, ratings: Map<String, Int>) -> Unit,
-    onLogout: () -> Unit,
+    appContentUiState: AppContentUiState,
+    appContentCallbacks: AppContentCallbacks,
     modifier: Modifier = Modifier,
     viewModel: ContentViewModel = viewModel()
 ) {
@@ -73,16 +84,21 @@ fun AppContent(
     var showBookDetails by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var shouldReloadCategoryAndHistory by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val timestamp = remember { mutableMapOf<Long, Int>() }
-    val currentTimestamp by rememberUpdatedState(currentRecommendationTimestamp)
+    var recommendationTimestamps by remember { mutableStateOf(mapOf<Long, Int>()) }
+    val currentTimestamp by rememberUpdatedState(appContentUiState.currentRecommendationTimestamp)
+    var openLogoutAlert by rememberSaveable {
+        mutableStateOf(false)
+    }
 
 
     //Map<RecommendedBookId, BookName> or Map<RecommendedBookId, Pair<BookName, Rating>
-    val likedBookMap = rememberSaveable { mutableMapOf<Int, String>() }
-    val disLikedBookMap = rememberSaveable { mutableMapOf<Int, String>() }
-    val ratingMap = rememberSaveable { mutableMapOf<Int, Pair<String, Int>>() }
+    val likedBookMap = rememberSaveable(appContentUiState.bookMap.hashCode()) {
+        mutableMapOf<Int, String>()
+    }
+    val disLikedBookMap = rememberSaveable(appContentUiState.bookMap.hashCode()) { mutableMapOf<Int, String>() }
+    val ratingMap = rememberSaveable(appContentUiState.bookMap.hashCode()) { mutableMapOf<Int, Pair<String, Int>>() }
+
 
     val showSnackbar = {
         scope.launch {
@@ -109,17 +125,15 @@ fun AppContent(
         }
     }
 
-    LaunchedEffect(bookMap.hashCode()) {
-        timestamp.clear()
+    LaunchedEffect(appContentUiState.bookMap.hashCode()) {
         withContext(dispatcherIO) {
-            val recommendations = fetchRecommendationTimestamp()
+            val recommendations = appContentCallbacks.fetchRecommendationTimestamp()
             val idTimestampMap = recommendations?.associate { it.timestamp to it.id }
             idTimestampMap?.let {
-                timestamp.putAll(it)
+                recommendationTimestamps = it
             }
         }
     }
-
 
     Scaffold(modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -132,7 +146,7 @@ fun AppContent(
             ) {
                 FloatingActionButton(
                     onClick = {
-                        if (recommendationStatus == RecommendationStatus.LOADING) {
+                        if (appContentUiState.recommendationStatus == RecommendationStatus.LOADING) {
                             Toast.makeText(
                                 context,
                                 "Can't recommend more while loading",
@@ -140,15 +154,14 @@ fun AppContent(
                             ).show()
                         } else {
                             if (Utils.isNetworkAvailable(context)) {
-                                onReloadCategoriesAndHistory(shouldReloadCategoryAndHistory)
-                                onRecommendMore(
+                                appContentCallbacks.onRecommendMore(
                                     likedBookMap.values.toList(),
                                     disLikedBookMap.values.toList(),
                                     ratingMap.values.toMap()
                                 )
-                                shouldReloadCategoryAndHistory = false
+                                snackbarHostState.currentSnackbarData?.dismiss()
+
                             } else {
-                                shouldReloadCategoryAndHistory = true
                                 showSnackbar()
                             }
                         }
@@ -203,7 +216,7 @@ fun AppContent(
                                     text = { Text(stringResource(R.string.label_log_out)) },
                                     onClick = {
                                         expanded = false
-                                        onLogout()
+                                        appContentCallbacks.onLogout()
                                     },
                                     trailingIcon = {
                                         Icon(
@@ -226,7 +239,7 @@ fun AppContent(
                 visible = selectedDestination == BookMatchRoute.HOME && !showBookDetails
             ) {
                 BookMatchBottomNavigation(
-                    recommendationStatus,
+                    appContentUiState.recommendationStatus,
                     selectedDestination = selectedDestination,
                     onDestinationChange = {
                         selectedDestination = it
@@ -242,12 +255,53 @@ fun AppContent(
             val booksList = remember { mutableListOf<BookDetails>() }
             if (!showBookDetails) {
 
+                if (openLogoutAlert) {
+                    AlertDialog(
+                        onDismissRequest = { openLogoutAlert = false },
+                        title = {
+                            Text("Logout")
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    openLogoutAlert = false
+                                    appContentCallbacks.onLogout()
+                                }
+                            ) {
+                                Text("Confirm")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    openLogoutAlert = false
+                                }
+                            ) {
+                                Text("Dismiss")
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = null
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = "Are you sure you want to logout ?",
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    )
+
+                }
+
                 HomeScreen(
-                    bookMap,
-                    timestamp,
+                    appContentUiState.bookMap,
+                    recommendationTimestamps,
                     currentTimestamp,
-                    fetchBooksFromId,
-                    filterEnabled,
+                    appContentCallbacks::fetchBooksFromRecommendationId,
+                    appContentCallbacks::filterEnabled,
                     onBookSelected = { book, bList ->
                         bookToShow = book
                         booksList.clear()
@@ -326,11 +380,11 @@ fun AppContent(
         } else if (selectedDestination == BookMatchRoute.EDIT) {
 
             CategorySelectionScreen(
-                categoryList,
-                selectedCategories,
-                onChipSelectionChange = onCategoryChipChange,
+                appContentUiState.categoryList,
+                appContentUiState.selectedCategories,
+                onChipSelectionChange = appContentCallbacks::onCategoryChipChange,
                 onContinueClicked = {
-                    if (onCategoryScreenContinue()) selectedDestination = BookMatchRoute.HOME
+                    if (appContentCallbacks.onCategoryScreenContinue()) selectedDestination = BookMatchRoute.HOME
                 },
                 modifier = Modifier.padding(paddingValues)
             )

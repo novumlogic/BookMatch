@@ -44,4 +44,11 @@ object SupabaseProvider {
         return Users(userInfo.id, email, displayName, avatarUrl)
 
     }
+
+    fun getAccessToken() : String{
+        return supabaseClient.auth.currentAccessTokenOrNull() ?: run {
+            println("No access token in current session")
+            ""
+        }
+    }
 }

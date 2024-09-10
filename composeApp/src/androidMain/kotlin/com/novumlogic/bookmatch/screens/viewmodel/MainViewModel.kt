@@ -9,7 +9,8 @@ import androidx.compose.runtime.setValue
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import api.OpenAIClient
+import api.BackendClient
+import com.novumlogic.bookmatch.screens.FailedReason
 import com.novumlogic.bookmatch.screens.FetchSource
 import com.novumlogic.bookmatch.screens.RecommendationStatus
 import com.novumlogic.bookmatch.screens.datastore
@@ -48,6 +49,7 @@ class MainViewModel(
 
     private lateinit var categoryMap: Map<String, Int>
     var fetchSource = FetchSource.SUPABASE
+    var failedReason by mutableStateOf(FailedReason.NONE)
 
     init {
         viewModelScope.launch {
@@ -59,11 +61,14 @@ class MainViewModel(
     private suspend fun fetchChatHistory() {
             val userId = getCurrentUserId()
             if (userId.isEmpty()) return
+
             val result = RemoteDataSource.fetchChatHistory(userId)
+
             result?.let { chatHistoryList ->
-                OpenAIClient.clearChatHistory()
+                BackendClient.clearChatHistory()
+
                 chatHistoryList.forEach {
-                    OpenAIClient.addUserMessage(it.userText)
+                    BackendClient.addUserMessage(it.userText)
                 }
             }?: run {
                 Log.d(TAG, "fetchChatHistory: fetch failed")
@@ -204,7 +209,37 @@ class MainViewModel(
         }
     }
 
-    suspend fun getBookRecommendation(
+    suspend fun performRecommendationTask(
+        context: Context,
+        selectedCategories: List<String>,
+        lastRecommendationTime: Long
+    ): RecommendationStatus {
+        val currentTime = System.currentTimeMillis()
+        val status: RecommendationStatus
+
+        //To fetch the data from db when opened everytime after killing
+        if (fetchSource == FetchSource.SUPABASE && lastRecommendationTime != 0L) {
+
+            status = fetchBooksFromDb(lastRecommendationTime)
+            failedReason = FailedReason.NO_INTERNET
+
+        } else {
+
+            status = getBookRecommendation(
+                selectedCategories,
+                currentTime
+            ) {
+                setLastRecommendationTime(context, currentTime)
+            }
+            failedReason = FailedReason.AI_ERROR
+
+        }
+        fetchSource = FetchSource.AI
+
+        return status
+    }
+
+    private suspend fun getBookRecommendation(
 
         selectedCategories: List<String>,
         lastRecommendationTime: Long,
@@ -212,10 +247,10 @@ class MainViewModel(
 
     ): RecommendationStatus {
 
-        OpenAIClient.clearChatHistory()
+        BackendClient.clearChatHistory()
 
         val categoriesStr = selectedCategories.joinToString(",")
-        val result = OpenAIClient.generateContent(categoriesStr)
+        val result = BackendClient.generateContent(categoriesStr)
 
         var status = RecommendationStatus.FAILED
         result?.let {
@@ -273,7 +308,6 @@ class MainViewModel(
                         bookDetails.pages,
                         bookDetails.isbn,
                         bookDetails.firstDateOfPublication,
-                        bookDetails.referenceLink
                     )
                 })
             }
@@ -368,7 +402,9 @@ class MainViewModel(
         lastRecommendationTime: Long,
         setLastRecommendationTime: suspend (Long) -> Unit
     ): RecommendationStatus {
+
         val userText = mutableListOf<String>()
+
         val text = if (liked.isEmpty() && disliked.isEmpty() && rating.isEmpty()) {
             """Suggest me more books in genres: ${
                 selectedCategories.joinToString(
@@ -379,28 +415,23 @@ class MainViewModel(
             }, do not repeat these books: ${totalBooks.joinToString(",", "[", "]")} """
 
         } else {
-            val remainingBooks = mutableListOf<String>().apply {
-                addAll(totalBooks)
-            }
 
+            val remainingBooks = ArrayList(totalBooks)
             userText.add("Suggest me more books in these ${selectedCategories.joinToString(",","[","]")} ")
             if(rating.isNotEmpty()) {
                 userText.add(" My rating $rating ")
-                remainingBooks.forEach {
-                    if(it in rating.keys) remainingBooks.remove(it)
-                }
+                val booksToRemove = remainingBooks.filter { it in rating.keys }
+                remainingBooks.removeAll(booksToRemove)
             }
             if(disliked.isNotEmpty()) {
                 userText.add("I dislike ${disliked.joinToString(",","[","]")} ")
-                remainingBooks.forEach {
-                    if(it in disliked) remainingBooks.remove(it)
-                }
+                val booksToRemove = remainingBooks.filter { it in disliked }
+                remainingBooks.removeAll(booksToRemove)
             }
             if(liked.isNotEmpty()){
                 userText.add("I like ${liked.joinToString(",","[","]")}")
-                remainingBooks.forEach {
-                    if(it in liked) remainingBooks.remove(it)
-                }
+                val booksToRemove = remainingBooks.filter { it in liked }
+                remainingBooks.removeAll(booksToRemove)
             }
             if(remainingBooks.isNotEmpty()){
                 userText.add(userText.size-1,"Do not repeat the mentioned books and ${remainingBooks.joinToString(",","[","]")}")
@@ -411,7 +442,7 @@ class MainViewModel(
             userText.joinToString(". ")
         }
 
-        val result = OpenAIClient.generateContent(text)
+        val result = BackendClient.generateContent(text)
 
         var status = RecommendationStatus.FAILED
         result?.let {
@@ -486,20 +517,24 @@ class MainViewModel(
 
     suspend fun fetchBooksFromRecommendationId(id: Int, timestamp: Long): RecommendationStatus {
         var status = RecommendationStatus.FAILED
+
         withContext(dispatcherIO) {
             val chatHistoryResult = RemoteDataSource.fetchChatHistory(timestamp)
             val result = RemoteDataSource.fetchBooks(id)
+
             result?.let {
                 chatHistoryResult?.let { list ->
-                    OpenAIClient.changeChatHistory(list)
+                    BackendClient.changeChatHistory(list)
                 }?: run {
                     Log.d(TAG, "fetchBooksFromId failed to change chat history")
                 }
+
                 _bookRecommendations.value = it
                 status = RecommendationStatus.LOADED
             }?: run {
                 status = RecommendationStatus.FAILED
             }
+
         }
         return status
 

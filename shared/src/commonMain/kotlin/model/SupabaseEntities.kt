@@ -39,17 +39,6 @@ data class RecommendedBooks(
 )
 
 @Serializable
-data class UserInteraction(
-    @SerialName("recommendation_book_id") val recommendationBookId: Int,
-    var liked: Boolean,
-    var rating: Int,
-    var read: Boolean,
-    @SerialName("last_updated_time") val lastUpdatedTime: Int,
-    val id: Int = 0
-)
-
-
-@Serializable
 data class Books(
     @SerialName("book_name") val bookName: String,
     @SerialName("author_name") val authorName: String,
@@ -59,7 +48,6 @@ data class Books(
     val pages: String,
     val isbn: String,
     @SerialName("first_date_of_publication") val firstDateOfPublication: String?,
-    @SerialName("reference_link") val referenceLink: String?,
     val id: Int = 0
 )
 
@@ -85,9 +73,4 @@ data class ChatHistory(
     val id: Int = 0,
 )
 
-@Serializable
-data class OldUserData(
-    val books: List<BookDetails>,
-    val timestamp: Long
-)
 

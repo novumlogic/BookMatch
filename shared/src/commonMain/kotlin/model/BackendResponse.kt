@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class OpenAIResponse(
+data class BackendResponse(
     val id: String,
     @SerialName("object")
     val objectField: String,

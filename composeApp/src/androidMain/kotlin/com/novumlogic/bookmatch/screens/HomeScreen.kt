@@ -1,5 +1,6 @@
 package com.novumlogic.bookmatch.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.novumlogic.bookmatch.R
 import com.novumlogic.bookmatch.utils.Utils
 import com.novumlogic.bookmatch.views.BookItem
-import com.novumlogic.bookmatch.views.HourSelectionDialog
+import com.novumlogic.bookmatch.views.ExpandableRecommendationDateList
 import model.BookDetails
 import java.time.Instant
 import java.time.ZoneId
@@ -48,9 +50,9 @@ import java.time.ZoneId
 @Composable
 fun HomeScreen(
     books: Map<String, List<BookDetails>>,
-    timestamp: Map<Long, Int>,
+    recommendationTimestamps: Map<Long, Int>,
     currentRecommendationTimestamp: Long,
-    fetchBooksFromId: (Int, Long) -> Unit,
+    fetchBooksFromRecommendationId: (Int, Long) -> Unit,
     filterEnabled: () -> Boolean,
     onBookSelected: (BookDetails, List<BookDetails>) -> Unit,
     onLikeDislike: (Int, String, Boolean?) -> Unit,
@@ -60,40 +62,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var openFilterDialog by remember { mutableStateOf(false) }
-    var openHourDialog by remember { mutableStateOf(false) }
-    val hoursForSelectedDate = remember { mutableMapOf<Long, Int>() }
-    val datePickerState =
-        rememberDatePickerState(
-            selectableDates =
-            object : SelectableDates {
-                val dayInMillis = 86400000L
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    var isSelectable = false
 
-                    timestamp.keys.forEach { timestamp ->
-                        if (timestamp in utcTimeMillis..<(utcTimeMillis + dayInMillis)) {
-                            isSelectable = true
-                        }
-                    }
-                    return isSelectable
-                }
-
-                override fun isSelectableYear(year: Int): Boolean {
-                    val _year = if (timestamp.keys.isEmpty()) Instant.now()
-                        .atZone(ZoneId.systemDefault()).year else Instant.ofEpochMilli(
-                        timestamp.keys.first()
-                    )
-                        .atZone(ZoneId.systemDefault()).year
-
-                    return year == _year
-
-                }
-            }
-        )
-
-    val confirmEnabled by remember {
-        derivedStateOf { datePickerState.selectedDateMillis != null }
-    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -124,53 +93,23 @@ fun HomeScreen(
 
         if (openFilterDialog) {
 
-            DatePickerDialog(
-                onDismissRequest = {
-                    // Dismiss the dialog when the user clicks outside the dialog or on the back
-                    // button. If you want to disable that functionality, simply use an empty
-                    // onDismissRequest.
+            BasicAlertDialog(
+                onDismissRequest = { openFilterDialog = false  },
+                modifier = modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.shapes.large
+                    )
+                    .heightIn(max = 450.dp)
+            ){
+                ExpandableRecommendationDateList(currentRecommendationTimestamp, recommendationTimestamps, onTimestampSelected = { recommendationId, time ->
+                    fetchBooksFromRecommendationId(recommendationId, time)
                     openFilterDialog = false
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            openFilterDialog = false
-                            hoursForSelectedDate.clear()
-                            datePickerState.selectedDateMillis?.let { selectedDateMillis ->
-                                hoursForSelectedDate.putAll(
-                                    timestamp.filter {
-                                        it.key in selectedDateMillis..<(selectedDateMillis + 86400000L)
-                                    }
-                                )
-                                openHourDialog = true
-                            }
-                        },
-                        enabled = confirmEnabled
-                    ) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { openFilterDialog = false }) { Text("Cancel") }
-                },
-            ) {
-                DatePicker(state = datePickerState, showModeToggle = false, title = {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "Choose from previous recommendations", modifier = Modifier.padding(top = 16.dp), fontSize = 18.sp)
-                    }
+                }, onDismiss = {
+                    openFilterDialog = false
                 })
             }
-        }
-
-        if (openHourDialog) {
-
-            HourSelectionDialog(currentRecommendationTimestamp, hoursForSelectedDate,
-                onHourSelected = { recommendationId, timestamp ->
-                    fetchBooksFromId(recommendationId, timestamp)
-                    openHourDialog = false
-                },
-                onDismissRequest = { openHourDialog = false }
-            )
 
         }
 

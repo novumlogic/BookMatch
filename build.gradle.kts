@@ -8,8 +8,6 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.kotlinxSerialization)
 
-    // Add the dependency for the Google services Gradle plugin
-    alias(libs.plugins.google.services) apply false
 
 }
 
